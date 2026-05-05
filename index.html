@@ -612,6 +612,9 @@ body::before{
       <div class="input-err" id="err-discordid"></div>
 
       <button class="primary-btn" id="start-btn" onclick="startQuiz()" disabled>Start Quiz →</button>
+      <div id="register-status" style="display:none;margin-top:.75rem;font-size:13px;color:#a5b4fc;text-align:center;">
+        ⏳ Registering your info, please wait a moment...
+      </div>
     </div>
   </div>
 
@@ -694,23 +697,23 @@ body::before{
 
 <script>
 // =============================================================================
-// モード設定
-// 'test'       : 擬似ログイン・テストデータ有効
-// 'production' : 本番モード
+// Mode Configuration
+// 'test'       : Pseudo-login enabled, test data active
+// 'production' : Production mode
 // =============================================================================
 const MODE = 'production'; // ★ Change to 'test' for testing
 
 const IS_PRODUCTION = MODE === 'production';
 
 // =============================================================================
-// 設定値 ★ 本番リリース前に全て実際の値に差し替えること
+// Configuration ★ Replace all values with actual values before production release
 // =============================================================================
 const GAS_URL    = 'https://script.google.com/macros/s/AKfycbxCmZcxC7BVotGyviNWFJjX6dEv4ZN2iuOzltYcORQ8-tri9jwU5tYFMoYhwM-ZIup_/exec';
 const _AS = [89,94,75,68,78,82,7,91,95,67,80,117,24,26,24,28];
 const API_SECRET = _AS.map(b => String.fromCharCode(b ^ 42)).join('');
 
 // =============================================================================
-// 設定チェック
+// Configuration Check
 // =============================================================================
 const PLACEHOLDERS = ['YOUR_GAS_DEPLOY_URL','YOUR_API_SECRET'];
 
@@ -723,15 +726,15 @@ function checkConfig() {
 
 
 // =============================================================================
-// 正規化ユーティリティ（全角→半角変換 + toLowerCase）
+// Normalization Utility (full-width → half-width + toLowerCase)
 // =============================================================================
 function normalizeInput(str) {
   if (!str) return '';
-  // 全角英数字・記号→半角
+  // Full-width alphanumerics/symbols → half-width
   let s = str.replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0));
-  // 全角スペース→半角スペース
+  // Full-width space → half-width space
   s = s.replace(/　/g, ' ');
-  // 全角記号の個別変換
+  // Individual full-width symbol conversions
   const zen2han = {'　':' ','！':'!','＂':'"','＃':'#','＄':'$','％':'%','＆':'&',
     '＇':"'",'（':'(','）':')','＊':'*','＋':'+','，':',','－':'-','．':'.','／':'/',
     '：':':','；':';','＜':'<','＝':'=','＞':'>','？':'?','＠':'@','［':'[','＼':'\\',
@@ -740,7 +743,7 @@ function normalizeInput(str) {
   return s.toLowerCase().trim();
 }
 
-// Discord ID バリデーション（英数字・_・.のみ、2〜32文字）
+// Discord ID Validation (alphanumerics, _ and . only, 2–32 chars)
 function validateDiscordId(raw) {
   const normalized = normalizeInput(raw);
   if (normalized.length < 2)  return { ok: false, msg: 'Discord ID must be at least 2 characters.' };
@@ -752,41 +755,41 @@ function validateDiscordId(raw) {
 }
 
 // =============================================================================
-// ストレージ
+// Storage
 // =============================================================================
 const STORAGE_KEY     = 'standx_quiz_v1_en';
 const STORAGE_VERSION = 1;
 
 // =============================================================================
-// 問題データ
+// Question Data
 // =============================================================================
 const QS = [
-  { questionId:'q01', q:'Does holding DUSD generate yield automatically?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! DUSD is designed to generate yield simply by holding it in your wallet. No staking or locking is required — rewards are calculated automatically based on your balance. You earn by holding, not by depositing.', ng:'❌ Incorrect. DUSD generates yield automatically just by holding it. Staking or locking is not required.'}},
-  { questionId:'q02', q:'Do you need to stake separately to earn DUSD yield?', choiceA:'A. Required', choiceB:'B. Not required', answer:'B', fb:{ok:'✅ Correct! DUSD uses a holding-based model, not staking. There are no lock periods, no unstaking wait times, and you can use it anytime. You can earn yield while keeping your liquidity intact.', ng:'❌ Incorrect. DUSD does not require staking. It is a holding-based model — you earn yield while maintaining full liquidity.'}},
-  { questionId:'q03', q:'Is inflation (new token issuance) the main source of DUSD rewards?', choiceA:'A. Yes', choiceB:'B. No', answer:'B', fb:{ok:'✅ Correct! The main revenue sources are staking rewards (ETH/SOL, etc.) and Perps Funding Fees (especially from the short side). Yield depends on market activity and varies with trading volume and funding conditions. Trading fees will be more directly linked through SIP-3.', ng:'❌ Incorrect. Revenue comes from staking rewards and Funding Fees, not inflation. Yield is generated from market activity.'}},
-  { questionId:'q04', q:'Is DUSD operated with a market-neutral mechanism?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! DUSD holds physical assets while hedging with an equivalent short position, making it neutral to price movements. However, it is not entirely risk-free — Funding reversals and hedge cost increases can affect yield.', ng:'❌ Incorrect. DUSD is market-neutral by design: long spot + equivalent short. However, it is not completely risk-free.'}},
-  { questionId:'q05', q:'Does the method of obtaining DUSD affect how rewards are calculated?', choiceA:'A. Yes, it changes', choiceB:'B. Basically no change', answer:'B', fb:{ok:'✅ Correct! Whether you mint, buy on a DEX, or receive DUSD as a transfer, it does not matter. The basis for reward calculation is how much you hold, not how you obtained it. Even if you acquire it mid-cycle, it becomes eligible from the next cycle.', ng:'❌ Incorrect. The method of acquisition does not matter. Your current balance is the basis for reward calculation.'}},
-  { questionId:'q06', q:'If you give up DUSD before settlement, is there a chance you won\'t receive rewards?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! Rewards are calculated every 7 days in a Yielding Circle. If you sell or transfer to another wallet during this period, it may affect rewards for that cycle. Both the time of holding and timing matter.', ng:'❌ Incorrect. The Yielding Circle calculation period matters. Selling or transferring during it may result in missing that cycle\'s rewards.'}},
-  { questionId:'q07', q:'Is DUSD redemption completed instantly?', choiceA:'A. Yes', choiceB:'B. No', answer:'B', fb:{ok:'✅ Correct! Redemption requires a lock period of approximately 7 days. You need to choose: prioritize speed → market sale, or prioritize stable pricing → redemption. There is a tradeoff between liquidity and certainty.', ng:'❌ Incorrect. Redemption takes approximately 7 days. Use market sale if you need immediate access.'}},
-  { questionId:'q08', q:'Is StandX a Perps DEX where DUSD can be used as collateral?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! DUSD can be used directly as collateral on StandX. Unlike typical setups where yield assets and trading capital are separate, StandX integrates them — you can trade without moving funds.', ng:'❌ Incorrect. DUSD can be used directly as collateral on StandX, combining yield and trading capital in one.'}},
-  { questionId:'q09', q:'Does opening a position stop DUSD yield?', choiceA:'A. Stops', choiceB:'B. Does not stop', answer:'B', fb:{ok:'✅ Correct! DUSD yield continues even when used as collateral. Additionally, if conditions are met, Position Yield (SIP-2) is added on top. A single capital unit works across multiple revenue layers simultaneously.', ng:'❌ Incorrect. DUSD yield continues even while used as collateral. It also qualifies for additional Position Yield under certain conditions.'}},
-  { questionId:'q10', q:'Is Position Yield (SIP-2) granted to all positions?', choiceA:'A. Yes', choiceB:'B. No', answer:'B', fb:{ok:'✅ Correct! Only positions meeting specific conditions are eligible: ① recorded as a valid position, ② meets minimum holding time, ③ valid risk state, ④ eligible market, ⑤ complies with max reward leverage. Simply entering a position is not enough.', ng:'❌ Incorrect. Position Yield has multiple conditions. A valid position, minimum holding time, risk state, and eligible market are all required.'}},
-  { questionId:'q11', q:'Does SIP-2 reward traders who increase trade frequency?', choiceA:'A. Yes', choiceB:'B. No', answer:'B', fb:{ok:'✅ Correct! The evaluation is based on time, not frequency. What matters is how long you remain in the market and how consistently you maintain your position — not how often you trade.', ng:'❌ Incorrect. SIP-2 evaluates duration, not frequency. Frequent short-term trades do not qualify.'}},
-  { questionId:'q12', q:'Does SIP-2 change liquidation rules or margin specifications?', choiceA:'A. Changes', choiceB:'B. Does not change', answer:'B', fb:{ok:'✅ Correct! Execution, Liquidation, and Margin specifications remain unchanged. SIP-2 only adds a reward layer — it does not reduce risk. Normal trading risks are fully maintained.', ng:'❌ Incorrect. SIP-2 does not change existing risk specifications. Trading risks remain the same.'}},
-  { questionId:'q13', q:'Can positions opened via Block Trade also qualify for Position Yield (SIP-2)?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! Position Yield evaluates the state of the position, not the entry method. Market orders, limit orders, and Block Trades are all eligible. What matters is whether the resulting position meets the conditions.', ng:'❌ Incorrect. The entry method does not matter. Block Trades can qualify for Position Yield if the position meets the conditions.'}},
-  { questionId:'q14', q:'Is liquidation penalty the main source of funds for Position Yield (SIP-2)?', choiceA:'A. Included', choiceB:'B. Basically not included', answer:'B', fb:{ok:'✅ Correct! The main sources are trading fees and Funding from normal market activity. Liquidation penalties and insurance fund flows are one-time/exceptional events and are not the primary source. Yield is based on continuous market participation.', ng:'❌ Incorrect. Position Yield is primarily funded by normal market activity (fees and Funding), not liquidation penalties.'}},
-  { questionId:'q15', q:'Is SIP-3 a proposal to strengthen the link between DUSD and trading fees?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! SIP-3 proposes distributing a portion of Perps trading fees to DUSD holders, creating a direct link: more trading volume → higher yield. Note: this is currently at the proposal stage.', ng:'❌ Incorrect. SIP-3 proposes routing a portion of trading fees to DUSD yield, directly linking market activity and returns.'}},
-  { questionId:'q16', q:'Does SIP-3 intend to distribute to all DUSD holders?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! The design intends for all DUSD holders to be eligible for distribution just by holding. Even users who do not actively trade can indirectly benefit from market activity.', ng:'❌ Incorrect. SIP-3 targets all DUSD holders. You do not need to trade to be eligible.'}},
-  { questionId:'q17', q:'Can Maker Points be earned from unexecuted limit orders?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! Maker Points evaluate liquidity provision, not execution. Placing and maintaining orders in the order book is recognized as providing value to the market.', ng:'❌ Incorrect. Maker Points reward order placement, not execution. Unexecuted orders still count as liquidity provision.'}},
-  { questionId:'q18', q:'Do Maker Points accrue the moment you place an order?', choiceA:'A. Yes', choiceB:'B. No', answer:'B', fb:{ok:'✅ Correct! Orders must remain in the order book for a certain period. Additionally, distance from mid price, order size, and placement quality all affect the evaluation. Only orders that genuinely improve market liquidity are rewarded.', ng:'❌ Incorrect. Maker Points require orders to remain on the book for a period of time. Placement quality is also evaluated.'}},
-  { questionId:'q19', q:'Is StandX a project that relies on VC funding?', choiceA:'A. Yes', choiceB:'B. No', answer:'B', fb:{ok:'✅ Correct! StandX is described as leaning toward a self-funded / community-driven structure. The focus is on product design rather than short-term token incentives.', ng:'❌ Incorrect. StandX follows a self-funded structure independent of VCs, prioritizing product design over token incentives.'}},
-  { questionId:'q20', q:'Is the essence of StandX to provide high APY?', choiceA:'A. Yes', choiceB:'B. No', answer:'B', fb:{ok:'✅ Correct! StandX generates value through multiple actions: holding DUSD, maintaining positions, and providing liquidity. Understanding how capital is deployed — not just a single APY number — is the key to grasping the full picture.', ng:'❌ Incorrect. StandX is about how capital works across multiple layers, not just a single high APY.'}},
+  { questionId:'q01', q:'Does holding DUSD generate yield automatically?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! DUSD is designed as a yield-bearing stablecoin, generating rewards simply by holding it in your wallet. No staking or locking operations are required — rewards are calculated automatically based on your balance. The condition for earning is holding, not depositing.', ng:'❌ Incorrect. DUSD is designed as a yield-bearing stablecoin. Rewards are generated automatically just by holding it in your wallet, with no staking required.'}},
+  { questionId:'q02', q:'Do you need to stake separately to earn DUSD yield?', choiceA:'A. Required', choiceB:'B. Not required', answer:'B', fb:{ok:'✅ Correct! DUSD uses a holding-based reward model, not staking. This means:\n· No lock periods\n· No unstaking wait times\nYou can earn yield while keeping your full liquidity intact.', ng:'❌ Incorrect. DUSD does not require staking. It is a holding-based model — no lock periods or unstaking wait times are needed.'}},
+  { questionId:'q03', q:'Is inflation (new token issuance) the main source of DUSD rewards?', choiceA:'A. Yes', choiceB:'B. No', answer:'B', fb:{ok:'✅ Correct! The main revenue sources are:\n· Funding Fees (from the short side of positions)\n· Trading fees\n· Staking rewards\nBecause yield depends on market activity, it varies with trading volume and market conditions.', ng:'❌ Incorrect. The main sources are Funding Fees, trading fees, and staking rewards — not inflation. Yield is generated from market activity.'}},
+  { questionId:'q04', q:'Is DUSD operated with a market-neutral mechanism?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! Deposited assets are structured as "spot holding + equivalent short hedge." This design suppresses price movement risk while generating yield from Funding and staking. However, it is not completely risk-free — Funding reversals and hedge costs can affect yield.', ng:'❌ Incorrect. DUSD is market-neutral by design: spot holding + equivalent short. That said, it is not entirely risk-free.'}},
+  { questionId:'q05', q:'Does the method of obtaining DUSD affect how rewards are calculated?', choiceA:'A. Yes, it changes', choiceB:'B. Basically no change', answer:'B', fb:{ok:'✅ Correct! Whether you mint, buy on a DEX, or receive DUSD via transfer, the acquisition method does not matter. The basis for reward calculation is "how much that address holds." Your current balance matters — not your history.', ng:'❌ Incorrect. The acquisition method does not affect rewards. Your current balance is what matters, regardless of how you obtained it.'}},
+  { questionId:'q06', q:'If you give up DUSD before settlement, is there a chance you won\'t receive rewards?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! Rewards are calculated in snapshot-like cycles at regular intervals. This makes the following important:\n· Holding during the calculation period\n· Holding at the time of settlement\nIf you sell or transfer during this period, you may miss that cycle\'s rewards.', ng:'❌ Incorrect. Rewards are calculated periodically. Selling or transferring during a calculation period may result in missing that cycle\'s rewards.'}},
+  { questionId:'q07', q:'Is DUSD redemption completed instantly?', choiceA:'A. Yes', choiceB:'B. No', answer:'B', fb:{ok:'✅ Correct! Redemption requires a set period (e.g. T+7). You need to choose based on your needs:\n· Want fast access → market sale\n· Want the official rate → redemption\nThere is a tradeoff between liquidity and time.', ng:'❌ Incorrect. Redemption takes a set period such as T+7. Use a market sale if you need immediate access.'}},
+  { questionId:'q08', q:'Is StandX a Perps DEX where DUSD can be used as collateral?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! DUSD can be used directly as collateral on StandX. While yield assets and trading capital are typically separate in other protocols, StandX integrates them — allowing you to trade without moving your funds.', ng:'❌ Incorrect. DUSD can be used directly as collateral on StandX, combining yield-bearing assets and trading capital in one.'}},
+  { questionId:'q09', q:'Does opening a position stop DUSD yield?', choiceA:'A. Stops', choiceB:'B. Does not stop', answer:'B', fb:{ok:'✅ Correct! DUSD yield continues even when used as collateral. On top of that, Position Yield (conditional) may be added. This is a structure where a single unit of capital works across multiple revenue layers simultaneously.', ng:'❌ Incorrect. DUSD yield continues even while used as collateral, and additional Position Yield may be earned on top.'}},
+  { questionId:'q10', q:'Is Position Yield (SIP-2) granted to all positions?', choiceA:'A. Yes', choiceB:'B. No', answer:'B', fb:{ok:'✅ Correct! Eligible positions must meet conditions such as:\n· Held for a minimum duration\n· Not in an excessive risk state\n· In an eligible market\nSimply entering a position is not enough to qualify.', ng:'❌ Incorrect. Position Yield has specific conditions including minimum holding time, valid risk state, and eligible market. Simply opening a position is not sufficient.'}},
+  { questionId:'q11', q:'Does SIP-2 reward traders who increase trade frequency?', choiceA:'A. Yes', choiceB:'B. No', answer:'B', fb:{ok:'✅ Correct! What is evaluated is "positions held over time." Rather than short-term turnover, what matters is:\n· How long you remain in the market\n· How consistently you maintain your position\nThis design directly influences your trading style.', ng:'❌ Incorrect. SIP-2 evaluates time-based positions, not trading frequency. Short-term rotation does not qualify.'}},
+  { questionId:'q12', q:'Does SIP-2 change liquidation rules or margin specifications?', choiceA:'A. Changes', choiceB:'B. Does not change', answer:'B', fb:{ok:'✅ Correct! Core specifications such as Execution and Liquidation remain unchanged. SIP-2 only adds a reward layer — risk itself is not reduced. Normal trading risks are fully maintained.', ng:'❌ Incorrect. SIP-2 does not change existing risk specifications. Only a reward layer is added.'}},
+  { questionId:'q13', q:'Can positions opened via Block Trade also qualify for Position Yield (SIP-2)?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! The evaluation criterion is "the state of the position," not the entry route. Whether via order book trading or Block Trade, the method does not matter. What matters is whether the resulting position meets the conditions — not how it was executed.', ng:'❌ Incorrect. The entry method does not matter. What matters is whether the resulting position meets the Position Yield conditions.'}},
+  { questionId:'q14', q:'Is liquidation penalty the main source of funds for Position Yield (SIP-2)?', choiceA:'A. Included', choiceB:'B. Basically not included', answer:'B', fb:{ok:'✅ Correct! The primary sources are normal trading activity such as Fees. The design avoids relying on one-time or exceptional revenue events.', ng:'❌ Incorrect. Position Yield is primarily funded by normal trading activity (fees, etc.), not liquidation penalties.'}},
+  { questionId:'q15', q:'Is SIP-3 a proposal to strengthen the link between DUSD and trading fees?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! By routing a portion of Perps trading fees to the DUSD yield side, SIP-3 creates a stronger connection:\n· More trading volume → higher yield\nNote: this is currently at the proposal stage.', ng:'❌ Incorrect. SIP-3 proposes routing a portion of trading fees to DUSD yield, directly linking market activity and returns.'}},
+  { questionId:'q16', q:'Does SIP-3 intend to distribute to all DUSD holders?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! The design intends for holders to receive benefits simply by holding DUSD. Even users who do not actively trade can participate indirectly.', ng:'❌ Incorrect. SIP-3 is designed for all DUSD holders. You do not need to trade to be eligible.'}},
+  { questionId:'q17', q:'Can Maker Points be earned from unexecuted limit orders?', choiceA:'A. Yes', choiceB:'B. No', answer:'A', fb:{ok:'✅ Correct! What is evaluated is not execution, but "whether liquidity is being placed on the order book." Orders that provide value to the market are recognized.', ng:'❌ Incorrect. Maker Points evaluate liquidity provision, not execution. Unexecuted orders still count as long as they provide liquidity.'}},
+  { questionId:'q18', q:'Do Maker Points accrue the moment you place an order?', choiceA:'A. Yes', choiceB:'B. No', answer:'B', fb:{ok:'✅ Correct! Orders must remain on the book for a certain period. Additionally, the following factors also affect evaluation:\n· Distance from mid price\n· Order size\nGenuine liquidity provision is required.', ng:'❌ Incorrect. Orders must remain on the book for a period of time. Distance from mid price and order size also affect evaluation.'}},
+  { questionId:'q19', q:'Is StandX a project that relies on VC funding?', choiceA:'A. Yes', choiceB:'B. No', answer:'B', fb:{ok:'✅ Correct! StandX is described as VC-independent, with a design that avoids relying on short-term token incentives. This philosophy directly influences the protocol\'s design choices.', ng:'❌ Incorrect. StandX follows a VC-independent structure, prioritizing product design over short-term token incentives.'}},
+  { questionId:'q20', q:'Is the essence of StandX to provide high APY?', choiceA:'A. Yes', choiceB:'B. No', answer:'B', fb:{ok:'✅ Correct! StandX generates value through multiple actions:\n· Holding (DUSD)\n· Maintaining positions (SIP-2)\n· Providing liquidity (Maker)\nRather than a single APY number, understanding "how your capital is being deployed" gives you the full picture.', ng:'❌ Incorrect. StandX is about how capital works across multiple layers — holding, positions, and liquidity provision — not just a single APY.'}},
   { questionId:'q21', q:"Why didn't my SL/TP trigger?", choiceA:"A. You might have placed another limit order that occupied your margin, so the SL/TP couldn't be executed.", choiceB:'B. The SL/TP order might have been canceled after you manually adjusted or partially closed your position.', answer:'A', fb:{ok:"✅ Correct! Always make sure you have enough margin and available quota after setting SL/TP. A competing limit order can consume your margin and prevent SL/TP execution.", ng:"❌ Incorrect. While manual adjustments can affect SL/TP, the more common cause is insufficient margin due to other limit orders. Always check your margin and quota after setting SL/TP."}},
   { questionId:'q22', q:'How many layers of yield can you earn on StandX?', choiceA:'A. 3', choiceB:'B. 4', answer:'A', fb:{ok:"✅ Correct! There are 3 layers: ① Basic yield from holding DUSD, ② Position Yield (SIP-2) — if you don\\'t want directional exposure, you can hedge with 1x LONG + 1x SHORT across different accounts, ③ SIP-3 yield from trading fee distribution.", ng:"❌ Incorrect. StandX offers 3 layers of yield: holding yield (DUSD), Position Yield (SIP-2), and fee-linked yield (SIP-3)."}}
 ];
 
 // =============================================================================
-// 状態
+// State
 // =============================================================================
 let userName      = '';
 let userDiscordId = ''; // Discord Community ID
@@ -798,7 +801,7 @@ let submitted     = false;
 let quizStarted   = false;
 
 // =============================================================================
-// 初期化
+// Initialization
 // =============================================================================
 (function init() {
   const configErrors = checkConfig();
@@ -879,7 +882,7 @@ function clearState() {
 }
 
 // =============================================================================
-// 画面遷移
+// Screen Transition
 // =============================================================================
 function show(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -888,7 +891,7 @@ function show(id) {
 }
 
 // =============================================================================
-// ログイン
+// Login
 // =============================================================================
 function doTestLogin() {
   document.getElementById('input-nickname').value = 'TestUser';
@@ -896,14 +899,14 @@ function doTestLogin() {
   onRegisterInput();
 }
 
-// 登録フォームの入力チェック（リアルタイム）
+// Registration Form Input Validation (real-time)
 function onRegisterInput() {
   const nick = document.getElementById('input-nickname').value.trim();
   const did  = document.getElementById('input-discordid').value.trim();
-  // エラーをリセット
+  // Reset errors
   document.getElementById('err-nickname').style.display = 'none';
   document.getElementById('err-discordid').style.display = 'none';
-  // 両方入力済みでスタートボタン活性化
+  // Enable start button when both fields are filled
   document.getElementById('start-btn').disabled = !(nick.length > 0 && did.length > 0);
 }
 
@@ -914,7 +917,7 @@ function showFieldErr(fieldId, msg) {
 }
 
 // =============================================================================
-// ニックネーム
+// Nickname
 // =============================================================================
 // checkName replaced by onRegisterInput
 
@@ -935,13 +938,13 @@ async function reserveBeforeStart(nickname, discordId) {
 
 
 // =============================================================================
-// クイズ開始
+// Start Quiz
 // =============================================================================
 async function startQuiz() {
   const rawNickname  = document.getElementById('input-nickname').value.trim();
   const rawDiscordId = document.getElementById('input-discordid').value.trim();
 
-  // クライアント側バリデーション
+  // Client-side validation
   document.getElementById('err-nickname').style.display = 'none';
   document.getElementById('err-discordid').style.display = 'none';
   let hasError = false;
@@ -963,10 +966,12 @@ async function startQuiz() {
   const inputNickname  = rawNickname;
   const inputDiscordId = didResult.normalized;
   const startBtn = document.getElementById('start-btn');
+  const registerStatus = document.getElementById('register-status');
   startBtn.disabled = true;
+  registerStatus.style.display = 'block';
 
   try {
-    // ステップ1: ニックネーム重複チェック
+    // Step 1: Nickname duplicate check
     const checkNickUrl = GAS_URL
       + '?action=checkNickname'
       + '&secret='   + encodeURIComponent(API_SECRET)
@@ -978,7 +983,7 @@ async function startQuiz() {
     catch(e) { throw { code: 'json_error', message: 'Failed to parse server response' }; }
     if (checkNickData.status !== 'ok') throw { code: checkNickData.code || 'gas_error', message: checkNickData.message || 'Server returned an error' };
 
-    // ステップ2: Discord ID重複チェック
+    // Step 2: Discord ID duplicate check
     const checkDidUrl = GAS_URL
       + '?action=checkDiscordId'
       + '&secret='    + encodeURIComponent(API_SECRET)
@@ -990,7 +995,7 @@ async function startQuiz() {
     catch(e) { throw { code: 'json_error', message: 'Failed to parse server response' }; }
     if (checkDidData.status !== 'ok') throw { code: checkDidData.code || 'gas_error', message: checkDidData.message || 'Server returned an error' };
 
-    // ステップ3: ニックネーム仮登録
+    // Step 3: Reserve nickname
     await reserveBeforeStart(inputNickname, inputDiscordId);
 
     if (answers.some(a => a !== null) && userName &&
@@ -1020,6 +1025,7 @@ async function startQuiz() {
   } catch(e) {
     const code = e.code || 'unknown';
     const msg  = e.message || 'Unknown error';
+    registerStatus.style.display = 'none';
 
     if (code === 'already_complete') {
       if (quizStarted) {
@@ -1082,7 +1088,7 @@ function updateProgress() {
 }
 
 // =============================================================================
-// クイズ構築
+// Build Quiz
 // =============================================================================
 function buildQuiz(isResume) {
   document.getElementById('submit-section').style.display = 'none';
@@ -1099,7 +1105,7 @@ function buildQuiz(isResume) {
     numEl.textContent = 'Q.' + (i+1) + ' / ' + QS.length;
     const textEl  = document.createElement('div'); textEl.className = 'q-text'; textEl.textContent = q.q;
 
-    // 覗きキャラ（未回答時のみ表示）
+    // Peek character (shown only when unanswered)
     const peekImg = document.createElement('img');
     peekImg.src = 'IMG_3177.PNG'; peekImg.alt = ''; peekImg.className = 'q-peek'; peekImg.id = 'peek-'+i;
 
@@ -1129,13 +1135,13 @@ function buildQuiz(isResume) {
   updateProgress();
 
   if (isResume) {
-    // 最後に回答した問題まで復元し、その問題だけ表示
+    // Restore up to the last answered question and show only that question
     const lastAnsweredIdx = answers.reduce((last, a, i) => a !== null ? i : last, -1);
     answers.forEach((choice, i) => { if (choice !== null) restoreAnswer(i, choice); });
     document.querySelectorAll('.q-section').forEach((el, i) => {
       if (i !== lastAnsweredIdx + 1) el.classList.add('hidden');
     });
-    // 全問回答済みなら結果表示
+    // Show results if all questions are answered
     if (answers.every(a => a !== null)) {
       document.querySelectorAll('.q-section').forEach(el => el.classList.add('hidden'));
       showSubmit();
@@ -1158,7 +1164,7 @@ function restoreAnswer(i, choice) {
     bs.className = 'choice ' + (ok ? 'correct' : 'wrong');
     if (!ok) br.className = 'choice show-correct';
   }
-  // 覗きキャラを非表示
+  // Hide peek character
   const peekEl = document.getElementById('peek-'+i);
   if (peekEl) peekEl.style.display = 'none';
 
@@ -1166,7 +1172,7 @@ function restoreAnswer(i, choice) {
   document.getElementById('fbb-'+i).textContent = ok ? q.fb.ok : q.fb.ng;
   const fb = document.getElementById('fb-'+i);
   fb.className = 'fb-box ' + (ok ? 'ok' : 'ng');
-  // 正解時に笑顔キャラを表示
+  // Show smile character on correct answer
   if (ok) {
     const existing = fb.querySelector('.fb-char');
     if (!existing) {
@@ -1177,7 +1183,7 @@ function restoreAnswer(i, choice) {
   }
   fb.style.display = 'block';
 
-  // 「次へ」ボタンを表示（最終問題以外）
+  // Show next button (except for last question)
   const card = document.getElementById('qcard-'+i);
   const existingBtn = card.querySelector('.next-btn');
   if (!existingBtn) {
@@ -1190,7 +1196,7 @@ function restoreAnswer(i, choice) {
       if (isLast) {
         showSubmit();
       } else {
-        // 現在の問題を隠して次を表示
+        // Hide current question and show next
         const currentSection = card.closest('.q-section');
         currentSection.classList.add('hidden');
         const next = document.getElementById('qcard-'+(i+1))?.closest('.q-section');
@@ -1215,7 +1221,7 @@ saveState();
   updateProgress();
 }
 // =============================================================================
-// 結果画面
+// Result Screen
 // =============================================================================
 function showSubmit() {
   const pct = score / QS.length;
@@ -1229,7 +1235,7 @@ function showSubmit() {
   document.getElementById('score-num').textContent = score + ' / ' + QS.length + ' Correct';
   document.getElementById('submit-section').style.display = 'block';
 
-  // 宝くじ桁
+  // Lottery Digits
   const digitsWrap = document.getElementById('lottery-digits');
   digitsWrap.textContent = '';
   for (let i = 0; i < 6; i++) {
@@ -1241,7 +1247,7 @@ function showSubmit() {
 }
 
 // =============================================================================
-// 宝くじ番号発行
+// Issue Lottery Number
 // =============================================================================
 async function issueLotteryNumber() {
   const statusEl = document.getElementById('lottery-status');
