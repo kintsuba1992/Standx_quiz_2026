@@ -652,12 +652,19 @@ body::before{
         <div class="note">※ Everyone who completes the quiz is eligible for the lottery, regardless of score.</div>
       </div>
 
+      <div class="screenshot-notice">
+        <div class="screenshot-icon">📸</div>
+        <div class="screenshot-text">
+          <strong>Take a screenshot and post it to the StandX Discord community</strong>
+          Make sure your nickname, score, and lottery number are all visible.
+        </div>
+      </div>
+
       <div class="summary-box">
         <div class="summary-title">Keep Stand — 3 Capital Utilization Layers</div>
         <ol class="summary-list">
           <li>Simply holding DUSD generates yield (Yield Layer)</li>
           <li>Maintaining positions adds Position Yield (SIP-2)</li>
-          <li>Placing limit orders earns Maker Points (Liquidity Provision)</li>
           <li>SIP-3 links trading fees with DUSD yield (proposal stage)</li>
         </ol>
       </div>
@@ -679,14 +686,6 @@ body::before{
           <strong>Market Activity → Revenue → DUSD Yield → Capital Growth → Continued Participation</strong></p>
         <p class="summary-body">However, since this structure depends on volume and Funding conditions, yield is variable, not fixed.</p>
         <p class="summary-body">In short, StandX is not just a high-yield product — it is <strong>a protocol that redesigns how capital works, unifying market participation and revenue generation</strong>.</p>
-      </div>
-
-      <div class="screenshot-notice">
-        <div class="screenshot-icon">📸</div>
-        <div class="screenshot-text">
-          <strong>Take a screenshot and post it to the StandX Discord community</strong>
-          Make sure your nickname, score, and lottery number are all visible.
-        </div>
       </div>
     </div>
   </div>
@@ -967,6 +966,31 @@ async function startQuiz() {
   startBtn.disabled = true;
 
   try {
+    // ステップ1: ニックネーム重複チェック
+    const checkNickUrl = GAS_URL
+      + '?action=checkNickname'
+      + '&secret='   + encodeURIComponent(API_SECRET)
+      + '&nickname=' + encodeURIComponent(inputNickname);
+    const checkNickRes  = await fetch(checkNickUrl);
+    if (!checkNickRes.ok) throw { code: 'http_error', message: 'HTTP ' + checkNickRes.status };
+    let checkNickData;
+    try { checkNickData = await checkNickRes.json(); }
+    catch(e) { throw { code: 'json_error', message: 'Failed to parse server response' }; }
+    if (checkNickData.status !== 'ok') throw { code: checkNickData.code || 'gas_error', message: checkNickData.message || 'Server returned an error' };
+
+    // ステップ2: Discord ID重複チェック
+    const checkDidUrl = GAS_URL
+      + '?action=checkDiscordId'
+      + '&secret='    + encodeURIComponent(API_SECRET)
+      + '&discordId=' + encodeURIComponent(inputDiscordId);
+    const checkDidRes  = await fetch(checkDidUrl);
+    if (!checkDidRes.ok) throw { code: 'http_error', message: 'HTTP ' + checkDidRes.status };
+    let checkDidData;
+    try { checkDidData = await checkDidRes.json(); }
+    catch(e) { throw { code: 'json_error', message: 'Failed to parse server response' }; }
+    if (checkDidData.status !== 'ok') throw { code: checkDidData.code || 'gas_error', message: checkDidData.message || 'Server returned an error' };
+
+    // ステップ3: ニックネーム仮登録
     await reserveBeforeStart(inputNickname, inputDiscordId);
 
     if (answers.some(a => a !== null) && userName &&
@@ -1011,10 +1035,10 @@ async function startQuiz() {
         startBtn.disabled = false;
       }
     } else if (code === 'duplicate_nickname') {
-      showFieldErr('err-nickname', 'This nickname is already in use. Please use a different nickname.');
+      showFieldErr('err-nickname', 'This nickname is already registered. Your progress has been saved — please return to your original device and browser to continue.');
       startBtn.disabled = false;
     } else if (code === 'duplicate_discordid') {
-      showFieldErr('err-discordid', 'This Discord ID is already registered. If this is you, please continue from your original device and browser.');
+      showFieldErr('err-discordid', 'This Discord ID is already registered. Your progress has been saved — please return to your original device and browser to continue.');
       startBtn.disabled = false;
     } else if (code === 'already_in_progress') {
       if (quizStarted) {
