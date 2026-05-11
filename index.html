@@ -936,11 +936,11 @@ async function startQuiz() {
 
   try {
     // checkAndRegister: check status + reserve in one call
-    const checkUrl = GAS_URL
-      + '?action=checkAndRegister'
-      + '&secret='    + encodeURIComponent(API_SECRET)
-      + '&discordId=' + encodeURIComponent(inputDiscordId);
-    const checkRes = await fetch(checkUrl);
+    const checkRes = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ secret: API_SECRET, action: 'checkAndRegister', discordId: inputDiscordId })
+    });
     if (!checkRes.ok) throw { code: 'http_error', message: 'HTTP ' + checkRes.status };
     let checkData;
     try { checkData = await checkRes.json(); }
@@ -1214,12 +1214,11 @@ async function issueLotteryNumber() {
   statusEl.textContent = 'Issuing number...';
 
   try {
-    const url = GAS_URL
-      + '?action=issue'
-      + '&secret='    + encodeURIComponent(API_SECRET)
-      + '&discordId=' + encodeURIComponent(userDiscordId)
-            + '&score='     + encodeURIComponent(score + '/' + QS.length);
-    const res = await fetch(url);
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ secret: API_SECRET, action: 'issue', discordId: userDiscordId, score: score + '/' + QS.length })
+    });
     if (!res.ok) throw { code: 'http_error', message: 'HTTP ' + res.status };
     let data;
     try { data = await res.json(); }
