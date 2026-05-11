@@ -963,6 +963,14 @@ async function startQuiz() {
     }
 
     // state === 'new' or 'in_progress'
+    if (checkData.state === 'in_progress' && !quizStarted) {
+      // Different browser/device — block access
+      showFieldErr('err-discordid', 'This Discord username is already in use on another device or browser. Please continue from your original device.');
+      startBtn.disabled = false;
+      registerStatus.style.display = 'none';
+      return;
+    }
+
     if (answers.some(a => a !== null) && userDiscordId &&
         userDiscordId !== inputDiscordId) {
       const reset = confirm(
@@ -1280,6 +1288,10 @@ function displayLotteryNumber(num) {
 }
 
 } // end startQuiz
+</script>
+</body>
+</html>
+/ end startQuiz
 </script>
 </body>
 </html>
