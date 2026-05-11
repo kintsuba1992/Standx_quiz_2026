@@ -948,7 +948,14 @@ async function startQuiz() {
     if (checkData.status !== 'ok') throw { code: checkData.code || 'gas_error', message: checkData.message || 'Server returned an error' };
 
     if (checkData.state === 'cleared') {
-      // Already completed — restore lottery number
+      // Block if different device (no local state)
+      if (!quizStarted) {
+        showFieldErr('err-discordid', 'This Discord username is already in use on another device or browser. Please continue from your original device.');
+        startBtn.disabled = false;
+        registerStatus.style.display = 'none';
+        return;
+      }
+      // Same device — restore lottery number
       userDiscordId = inputDiscordId;
       userName = inputDiscordId;
       lotteryNumber = checkData.number;
